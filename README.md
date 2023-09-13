@@ -13,7 +13,7 @@ This is a method of implementing empirical asset pricing in Python mainly based 
 
 ## Time Series Analysis
 - Analysis and forecast of China's tax revenue based on SARIMA model
-- Practice of VECM, ARMA models and testing methods
+- Practice of VAR, ARMA models and some famous testing methods
 
 ---
 ### Report bugs：
