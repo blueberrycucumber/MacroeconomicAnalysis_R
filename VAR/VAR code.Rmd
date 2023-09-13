@@ -1,0 +1,135 @@
+---
+title: "hw3.var"
+author: "易芊然 2020301051192"
+date: "2022/11/26"
+output:
+  word_document: default
+  html_document: default
+---
+
+# 
+```{r}
+rm(list = ls())
+library(vars)
+library(urca)
+opar=par(no.readonly=TRUE)
+mydata <- read.csv("D:/Users/HUAWEI/Desktop/cpi+mpi+ppi.csv",header=T)
+par(mfrow=c(3,1))
+cpi <-ts(mydata$cpi,start=c(2013,1),end=c(2021,11),freq=12)
+plot(cpi)
+mpi <-ts(mydata$mpi,start=c(2013,1),end=c(2021,11),freq=12)
+plot(mpi)
+ppi <-ts(mydata$ppi,start=c(2013,1),end=c(2021,11),freq=12)
+plot(ppi)
+```
+```{r}
+#数据预处理
+lcpi <- log(cpi)
+lmpi <- log(mpi)
+lppi <- log(ppi)
+par(mfrow = c(3,1))
+plot(lcpi)
+plot(lppi)
+plot(lmpi)
+llmpi <- lmpi-decompose(lmpi)$seasonal
+llppi <- lppi-decompose(lppi)$seasonal
+llcpi <- lcpi-decompose(lcpi)$seasonal
+```
+```{r}
+#adf检验和平稳化处理
+library(tseries)
+adf.test(llmpi)
+adf.test(llppi)
+adf.test(llcpi)
+#可以简单知道都不是平稳的
+
+summary(ur.df(llmpi,lags = 5,type = "trend"))
+#llmpi不具有趋势项，也没有漂移项，一阶差分滞后项的系数最为显著
+summary(ur.df(llmpi,lags = 5,type = "none"))
+#可知该过程依旧不是平稳过程，且一阶差分之后的系数最为显著，故对数据要进行一次差分处理
+summary(ur.df(diff(llmpi),lags = 1,type = "none"))
+#感天动地（终于他妈的显著了，，）
+#由上可知，tau1=-5.2544<-1.95,所以在做完一阶差分后，该过程是一个平稳过程，lag=1。
+
+summary(ur.df(llcpi,lags = 10,type = "trend"))
+#phi2 phi3表明：有漂移项和趋势项。滞后阶数再取小
+summary(ur.df(llcpi,lags = 1,type = "trend"))
+#没有趋势项，也没有漂移项
+summary(ur.df(diff(llcpi),lags = 1,type = "none"))
+#差分之后，tau1=-5.9852<-2.58，非常显著。说明做完一阶差分后，该序列是一个平稳序列。lag=1。
+
+summary(ur.df(llppi,lags = 5,type = "trend"))
+#llppi没有趋势项也没有漂移项，一阶差分滞后项最显著
+summary(ur.df(llppi,lags = 5,type = "none")) #仍然不是平稳过程，对数据进行差分处理
+summary(ur.df(diff(llppi),lags = 1,type = "none"))
+#tau1显示是显著的
+```
+```{r}
+#格兰杰因果检验分析
+grangertest(llmpi, llcpi,order = 3)
+grangertest(llcpi, llmpi,order = 3)
+grangertest(llppi, llcpi,order = 3)
+grangertest(llcpi, llppi,order = 3)
+grangertest(llmpi, llppi,order = 3)
+grangertest(llppi, llmpi,order = 3)
+```
+
+```{r}
+#VAR模型的建立和分析
+#滞后阶数的确定
+diff_llcpi<- diff(llcpi)
+diff_llmpi<- diff(llmpi)
+diff_llppi<- diff(llppi)
+diff_data <- cbind(diff_llmpi, diff_llppi, diff_llcpi)
+VARselect(diff_data, lag.max = 5, type = "none")
+
+varmodel <- VAR(diff_data,p = 1,type = "none")
+roots(varmodel)
+summary(varmodel,equation="diff_llcpi")
+
+#残差自相关性检验
+par(mfrow = c(3,1))
+acf(resid(varmodel)[,1])
+acf(resid(varmodel)[,2])
+acf(resid(varmodel)[,3])
+
+#模型的预测
+prediction<-predict(varmodel,n.head=36,ci=0.95)
+plot(prediction,names="diff_llcpi")
+
+```
+
+```{r}
+#脉冲响应分析
+#MPI对CPI的正交脉冲响应函数分析
+irf1 <- irf(varmodel, impulse = "diff_llmpi", response = "diff_llcpi", n.ahead = 20, boot = FALSE, seed = 1256)
+plot(irf1)
+#PPI对CPI的正交脉冲响应函数分析
+irf2 <- irf(varmodel, impulse = "diff_llppi", response = "diff_llcpi", n.ahead = 20, boot = FALSE, seed = 1256)
+plot(irf2)
+#MPI对PPI的正交脉冲响应函数分析
+irf3 <- irf(varmodel, impulse = "diff_llmpi", response = "diff_llppi", n.ahead = 20, boot = FALSE, seed = 1256)
+plot(irf3)
+
+```
+
+```{r}
+#方差分解分析
+fevd.cpi<-fevd(varmodel,n.ahead=20)$diff_llcpi
+fevd.cpi
+fevd.mpi<-fevd(varmodel,n.ahead=20)$diff_llmpi
+fevd.mpi
+fevd.ppi<-fevd(varmodel,n.ahead=20)$diff_llppi
+fevd.ppi
+
+
+```
+
+
+
+
+
+
+
+
+
