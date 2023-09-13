@@ -1,0 +1,119 @@
+---
+title: "ARMA model"
+author: "易芊然 2020301051192"
+date: "2022/10/18"
+output: html_document
+---
+```{r}
+rm(list = ls())
+
+library(forecast)
+library(tseries)
+library(TTR)
+```
+
+```{r}
+library(readxl)
+test_2 <- read_excel("D:/Users/HUAWEI/Desktop/test.2.xls")
+gdpst <- ts(test_2$gdp00, start = c(2013,1), end=c(2022,2),freq = 4)
+plot(gdpst) #输出时序图
+acf(gdpst, lag = 50) #输出自相关函数图
+par(mfrow= c(1,2))
+acf(diff(gdpst),lag=50)
+pacf(diff(gdpst),lag=50)
+gdp.ar<-ar(diff(gdpst),method="mle")
+gdp.ar$order
+gdp.ar$ar
+Mod(polyroot(c(1,-gdp.ar$ar)))    #计算ar模型的平稳性
+acf(gdp.ar$res[-(1:gdp.ar$order)],lag=50)
+```
+
+
+```{r}
+gdp.ma<-arima(gdpst,order=c(0,0,1))
+gdp.ma
+tstats<-coef(gdp.ma)/sqrt(diag(vcov(gdp.ma)))
+tstats
+
+```
+
+```{r}
+acf(gdp.ma$res[-1],lag=50)
+AIC(gdp.ma)
+BIC(gdp.ma)
+jarque.bera.test(gdp.ma$residuals)
+predict.ma<-predict(gdp.ma,n.ahead=12)
+plot(predict.ma$pred)    #ma only have one period memory
+
+```
+
+```{r}
+#To select the best arma for the data
+auto.arima(gdpst,max.p=8,max.q=8,d=0,D=0,seasonal=FALSE)
+#this is a model without the difference and seasonal
+bestmodel<-auto.arima(gdpst)
+bestmodel
+bestmodel$arma
+#consider the non-stationary and seasonal effect
+gg=forecast(bestmodel,h=12)
+plot(gg)
+lines(gdpst)
+#predict the 3-year of the gdp
+
+```
+```{r}
+#about the seasonal effect
+t<-decompose(gdpst)$trend
+s<-decompose(gdpst)$seasonal
+r<-decompose(gdpst)$random
+par(mfrow=c(1,3))
+plot(t)
+plot(r)
+plot(s)
+
+ss<-ma(gdpst,3)
+ss
+# to smooth the series using 2q+1 observations
+sss<-SMA(gdpst,n=2)
+sss
+# to smooth using sma funtion of the TTR library
+# ma and sma produce the similar result with the same window
+plot(ss)
+plot(sss)
+plot(gdpst)
+par(mfrow=c(1,1))
+acf(diff(na.omit(ss)),lag=40)
+
+gdp.arima1<-arima(gdpst,order=c(1,1,0),seas=list(order=c(1,0,0),4),method = 'ML')
+gdp.arima2<-arima(gdpst,order=c(1,1,0),seas=list(order=c(1,1,0),4),method = 'ML')
+BIC(gdp.arima1)
+BIC(gdp.arima2)
+acf(resid(gdp.arima1))
+acf(resid(gdp.arima2))
+
+
+```
+
+```{r}
+bestmodel2<-auto.arima(gdpst,max.p=8,max.q=8,d=1,D=1,seasonal=TRUE)
+#consider the non-stationary and seasonal effect
+bestmodel2$arma
+bestmodel2
+tstats<-coef(bestmodel2)/sqrt(diag(bestmodel2$var.coef))
+tstats
+par(mfrow=c(1,3))
+acf(resid(bestmodel2))
+acf(resid(bestmodel2),ci=0.99)
+#show the selection of lag order
+gg=forecast(bestmodel2,h=12)
+plot(gg)
+lines(gdpst)
+
+# 不用auto是选择出最佳模型的代码
+
+```
+
+
+
+
+
